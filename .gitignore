@@ -1,0 +1,4 @@
+**/__pycache__
+config.toml
+.mypy_cache/
+notes/

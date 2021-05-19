@@ -1,0 +1,23 @@
+extensions = ["test", "accounts", "login", "get_gateway", "gateway"]  # appends app/extensions/ to the header
+version = 9
+
+[app]
+port = 8080
+address = "0.0.0.0"
+public_url = "localhost:8080"
+
+[database]
+host = "localhost"
+port = 5432
+database = "discord"
+user = "averagediscorduser"
+password = "discordsucks123"
+
+[tokens]
+epoch = 1420070400000  # this is the default discord epoch
+worker_id = 1
+process_id = 0
+secret_key = "insert custom secret key here"
+
+[gateway]
+heartbeat_interval = 45000  # ms
