@@ -82,13 +82,6 @@ class GuildID(RequestHandler):
             if guild is None:
                 return self.error(JsonErrors.missing_key, 403)
 
-            channels = await conn.fetch("select * from guild_channels where guild_id=$1", guild_id)
-        
-        channels = [filter_channel_keys(dict(channel)) for channel in channels]
-
-        guild = dict(guild)
-        guild["channels"] = channels
-
         self.write(dict(guild))
         self.flush()
 
@@ -127,11 +120,11 @@ class GuildID(RequestHandler):
         if response == "0":
             return self.error(JsonErrors.missing_access, 403)
 
-        del self.application.destinations["guild"][guild_id]
         self.set_status(204)
         self.flush()
 
         self.application.dispatch_event("guild_delete", {"id": guild_id, "unavailable": False}, index=guild_id, index_type="guild")
+        del self.application.destinations["guild"][guild_id]
 
 def setup(app):
     return [

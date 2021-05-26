@@ -58,5 +58,22 @@ class Channels(RequestHandler):
 
         self.write(channels)
 
+class ChannelID(RequestHandler):
+    async def delete(self, channel_id: str):
+        async with self.database.accqire() as conn:
+            channel = await conn.fetchrow("delete from guild_channels where id=$1 return *", channel_id)
+        
+        if not channel:
+            return self.error(JsonErrors.missing_access, 403)
+
+        self.set_status(204)
+        self.flush()
+
+        channel = filter_channel_keys(channel)
+
+        self.application.dispatch_event("channel_delete", channel, index=channel_id, index_type="channel")
+        del self.application.destinations["channel"][channel_id]
+
+
 def setup(app):
     return [(f"/api/v{app.version}/guilds/(.+)/channels", Channels, app.args)]
