@@ -10,7 +10,7 @@ import logging
 class Specs:
     generic = cerberus.Validator({
         "op": {
-            "type": "integer",
+            "type": "number",
             "allowed": [0,1,2,3,4,5,6,7,9,10,11]
         },
         "d": {
@@ -21,7 +21,7 @@ class Specs:
 
     identify = cerberus.Validator({
         "token": {"type": "string"},
-        "intents": {"type": "integer"},
+        "intents": {"type": "number"},
         "properties": {
             "type": "dict",
             "schema": {
@@ -35,15 +35,14 @@ class Specs:
 class Gateway(WebSocketHandler):
     last_heartbeat_ack: Optional[datetime.datetime]
 
-    def initialize(self, database: DB, tokens: Tokens):
+    def initialize(self, database: DB, tokens: Tokens) -> None:
         self.last_heartbeat_ack = datetime.datetime.utcnow()
         self.identity = None
         self.user_id = None
         self.s = 0
         self.queue = asyncio.Queue[tuple[str, dict[str, Any]]]()
         self.heartbeat_interval = self.application.config["gateway"]["heartbeat_interval"]
-        
-        return super().initialize(database, tokens)
+        super().initialize(database, tokens)
 
     async def open(self):
         version = self.get_query_argument("v", default=None)
@@ -54,7 +53,7 @@ class Gateway(WebSocketHandler):
         if encoding != "json":
             return self.close(GatewayErrors.unknown, "Invalid encoding, only json is supported.")
 
-        self.send_message(GatewayOps.hello, {"heartbeat_interval": self.heartbeat_interval})
+        await self.send_message(GatewayOps.hello, {"heartbeat_interval": self.heartbeat_interval})
 
     async def on_message(self, message):
         try:
@@ -87,6 +86,8 @@ class Gateway(WebSocketHandler):
 
             self.intents = payload["intents"]
 
+            self.application.gateway_connections[self.user_id] = self
+
             asyncio.create_task(self.dispatcher())
 
         if data["op"] == GatewayOps.heartbeat:
@@ -94,14 +95,19 @@ class Gateway(WebSocketHandler):
 
             # TODO: actually do heartbeating
 
-    async def on_close(self):
+    def on_close(self):
         logging.info("Closing gateway connection with user id %s", self.user_id)
+        if self.user_id is not None:
+            del self.application.gateway_connections[self.user_id]
 
     async def dispatcher(self):
         while True:
             event_name, payload = await self.queue.get()
-            self.send_message(GatewayOps.dispatch, payload, s=self.s, t=event_name)
+            await self.send_message(GatewayOps.dispatch, payload, s=self.s, t=event_name)
             self.s += 1
+
+    def push_event(self, event_name: str, payload: dict[str, Any]):
+        self.queue.put_nowait((event_name, payload))
 
 def setup(app):
     return [(f"/api/v{app.version}/gateway/connect", Gateway, app.args)]

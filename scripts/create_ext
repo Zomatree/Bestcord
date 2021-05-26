@@ -14,7 +14,7 @@ class {class_name}(RequestHandler):
     pass
 
 def setup(app):
-    return [(f"/api/v{{app.version}}/{file_name}", {class_name}, app.args)]
+    return [(f"/api/v{{app.version}}/{file_path}", {class_name}, app.args)]
 
 """
 

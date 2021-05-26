@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncpg
 import contextlib
 import argon2
+import ujson
+from typing import Any
 
 from .errors import CustomError
 
-all_discrims = set(str(d).rjust(4, "0") for d in range(1, 1000))
+all_discrims: set[str] = set(str(d).rjust(4, "0") for d in range(1, 1000))
 
 class DB:
     def __init__(self, pool: asyncpg.Pool):
@@ -14,8 +16,13 @@ class DB:
         self.hasher = argon2.PasswordHasher()
 
     @classmethod
-    async def from_args(cls, args):
-        pool = await asyncpg.create_pool(**args)
+    async def connection_init(cls, connection: asyncpg.Connection) -> asyncpg.Connection:
+        await connection.set_type_codec("json", encoder=ujson.dumps, decoder=ujson.loads, schema="pg_catalog")
+        return connection
+
+    @classmethod
+    async def from_args(cls, args: dict[str, str]):
+        pool = await asyncpg.create_pool(**args, init=cls.connection_init)
         assert pool
         return cls(pool)
 
@@ -26,7 +33,7 @@ class DB:
                 conn: asyncpg.Connection
                 yield conn
 
-    async def create_account(self, username, email, password, id):
+    async def create_account(self, username: str, email: str, password: str, id: str) -> dict[str, Any]:
         async with self.accqire() as conn:
             hashed = self.hasher.hash(password)
 

@@ -1,41 +1,49 @@
 class CustomError(Exception):
     pass
 
+
+tup = tuple[int, str]
+
 class JsonErrors:
-    general = (0, "Invalid")
-    missing_key = (0, "Missing Required Key")
-    invalid_form = (50035, "Invalid Form Body")
+    general: tup = (0, "Invalid")
+    missing_key: tup = (0, "Missing Required Key")
+
+    unknown_channel: tup = (10003, "Uknown Channel")
+
+    missing_access: tup = (50001, "Missing Acess")
+    invalid_form: tup = (50035, "Invalid Form Body")
+    empty_message: tup = (50006, "Cannot Send An Empty Message")
 
 class HTTPErrors:
-    invalid_method = (0, "405: Method Not Allowed")
-    unauthorized = (0, "401: Unauthorized")
+    invalid_method: tup = (0, "405: Method Not Allowed")
+    unauthorized: tup = (0, "401: Unauthorized")
 
 class GatewayOps:
-    dispatch = 0
-    heartbeat = 1
-    identify = 2
-    presence_update = 3
-    voice_state_update = 4
-    resume = 5
-    reconnect = 6
-    request_guild_members = 7
-    invalid_session = 9
-    hello = 10
-    heartbeat_ack = 11
+    dispatch: int = 0
+    heartbeat: int = 1
+    identify: int = 2
+    presence_update: int = 3
+    voice_state_update: int = 4
+    resume: int = 5
+    reconnect: int = 6
+    request_guild_members: int = 7
+    invalid_session: int = 9
+    hello: int = 10
+    heartbeat_ack: int = 11
 
 class GatewayErrors:
-    unknown = 4000
-    bad_opcode = 4001
-    decode_error = 4002
-    not_authed = 4003
-    auth_failed = 4004
-    already_authed = 4005
+    unknown: int = 4000
+    bad_opcode: int = 4001
+    decode_error: int = 4002
+    not_authed: int = 4003
+    auth_failed: int = 4004
+    already_authed: int = 4005
     
-    invalid_seq = 4007
-    rate_limited = 4008  # :^)
-    session_timed_out = 4009
-    invalid_shard = 4010  # probably not going to be used
-    sharding_required = 4011  # probably not going to be used
-    invalid_version = 4012
-    invalid_intents = 4013  # probably not going to be used
-    disallowed_intent = 4014  # probably not going to be used
+    invalid_seq: int = 4007
+    rate_limited: int = 4008  # :^)
+    session_timed_out: int = 4009
+    invalid_shard: int = 4010  # probably not going to be used
+    sharding_required: int = 4011  # probably not going to be used
+    invalid_version: int = 4012
+    invalid_intents: int = 4013  # probably not going to be used
+    disallowed_intent: int = 4014  # probably not going to be used

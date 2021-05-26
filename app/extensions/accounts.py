@@ -7,7 +7,7 @@ class Accounts(RequestHandler, require_token=False):
         "password": {"type": "string"},
         "email": {"type": "string"}
     })
-    async def post(self):
+    async def post(self) -> None:
         try:
             account = await self.database.create_account(self.body["username"], self.body["email"], self.body["password"], self.tokens.create_id())
         except CustomError:

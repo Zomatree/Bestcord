@@ -2,3 +2,5 @@
 config.toml
 .mypy_cache/
 notes/
+test.py
+tests.py
