@@ -89,11 +89,19 @@ class Gateway(WebSocketHandler):
             self.application.gateway_connections[self.user_id] = self
 
             asyncio.create_task(self.dispatcher())
+            asyncio.create_task(self.heartbeat_task())
 
         if data["op"] == GatewayOps.heartbeat:
             self.last_heartbeat_ack = datetime.datetime.utcnow()
 
-            # TODO: actually do heartbeating
+    async def heartbeat_task(self):
+        sleep_interval = (self.heartbeat_interval * 1.25) / 1000
+        delta = datetime.timedelta(seconds=sleep_interval)
+
+        while True:
+            asyncio.sleep(sleep_interval)
+            if self.last_heartbeat_ack < datetime.datetime.utcnow() - delta:
+                self.close()
 
     def on_close(self):
         logging.info("Closing gateway connection with user id %s", self.user_id)
