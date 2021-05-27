@@ -1,6 +1,6 @@
 from .enums import ChannelType
 
-channel_keys = {
+channel_keys: dict[int, list[str]] = {
     ChannelType.text: ["id", "name", "type", "topic", "position", "rate_limit_per_user", "parent_id", "nsfw"],
     ChannelType.voice: ["id", "name", "type", "topic", "bitrate", "user_limit", "position", "parent_id"]
 }

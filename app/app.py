@@ -16,7 +16,7 @@ class ExtensionProtocol(Protocol):
         raise NotImplementedError
 
 destination_keys = Literal["guild", "channel"]
-logger = logging.getLogger("app")
+logger: logging.Logger = logging.getLogger("app")
 
 class App(Application):
     def __init__(self, database: DB, config: dict[str, Any]):

@@ -1,0 +1,9 @@
+repos:
+- repo: local
+  hooks: 
+    - id: pyright
+      name: pyright
+      entry: pyright
+      types: [python]
+      language: system
+      args: ["--pythonversion", "3.9", "--venv-path", ".venv"]
