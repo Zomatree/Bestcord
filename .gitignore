@@ -5,3 +5,4 @@ notes/
 test.py
 tests.py
 .venv
+.vscode
