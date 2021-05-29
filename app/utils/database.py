@@ -5,10 +5,14 @@ import contextlib
 import argon2
 import ujson
 from typing import Any
+import datetime
 
 from .errors import CustomError
 
 all_discrims: set[str] = set(str(d).rjust(4, "0") for d in range(1, 1000))
+
+def now() -> str:
+    return datetime.datetime.utcnow().isoformat()
 
 class DB:
     def __init__(self, pool: asyncpg.Pool):

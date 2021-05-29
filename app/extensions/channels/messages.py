@@ -1,5 +1,5 @@
 
-from app.utils import spec, RequestHandler, embed_spec, allowed_mentions_spec, JsonErrors
+from app.utils import spec, RequestHandler, embed_spec, allowed_mentions_spec, JsonErrors, MessageTypes
 from asyncpg.exceptions import ForeignKeyViolationError
 
 class Messages(RequestHandler):
@@ -31,11 +31,20 @@ class Messages(RequestHandler):
             except ForeignKeyViolationError:
                 return self.error(JsonErrors.unknown_channel, status_code=404)
 
+            guild_id = await conn.fetchval("select guild_id from guild_channels where id=$1", channel_id)
+
         message = {
             "id": id,
             "content": content,
             "embeds": embeds,
             "tts": tts,
+            "channel_id": channel_id,
+            "attachments": [],
+            "edited_timestamp": None,
+            "type": MessageTypes.default,
+            "pinned": False,
+            "mention_everyone": False,
+            "mentions": []
         }
 
         if allowed_mentions is not None:
@@ -44,7 +53,21 @@ class Messages(RequestHandler):
         self.write(message)
         self.flush()
 
+        message["author"] = self.application.user_cache[self.user_id]
+        message["member"] = self.application.member_cache[guild_id][self.user_id]  # type: ignore
+
+        print(message)
+
         self.application.dispatch_event("message_create", message, index=channel_id, index_type="channel")
+
+    async def get(self, channel_id: str):
+        limit = self.get_query_argument("limit", "100")
+
+        async with self.database.accqire() as conn:
+            messages = await conn.fetch("select * from messages where channel_id=$1 order by id desc limit $2", channel_id, limit)
+        
+        self.write(messages)
+        self.flush()
 
 def setup(app):
     return [(f"/api/v{app.version}/channels/(.+)/messages", Messages, app.args)]

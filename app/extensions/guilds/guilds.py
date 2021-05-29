@@ -1,5 +1,5 @@
 
-from app.utils import spec, RequestHandler, JsonErrors, filter_channel_keys
+from app.utils import spec, RequestHandler, JsonErrors, now
 
 
 class Guild(RequestHandler):
@@ -46,12 +46,13 @@ class Guild(RequestHandler):
         explicit_content_filter = self.body["explicit_content_filter"]
 
         guild_id = self.tokens.create_id()
+        now = now()
 
         async with self.database.accqire() as conn:
             guild = await conn.fetchrow("insert into guilds(name, id, owner_id, verification_level, default_message_notifications, explicit_content_filter) values($1, $2, $3, $4, $5, $6) returning *",
                                         name, guild_id, self.user_id, verification_level, default_message_notifications, explicit_content_filter)
 
-            member = await conn.execute("insert into guild_members(user_id, guild_id) values ($1, $2)", self.user_id, guild_id)
+            member = await conn.fetch("insert into guild_members(user_id, guild_id, joined_at) values ($1, $2, $3) returning *", self.user_id, guild_id, now)
 
         # TODO: do roles and channels
 
@@ -69,8 +70,15 @@ class Guild(RequestHandler):
         guild["presences"] = []
         guild["member_count"] = 1
 
-        assert self.user_id
+        member = {
+            "id": self.user_id,
+            "nick": None,
+            "mute": False,
+            "deaf": False,
+            "joined_at": now
+        }
 
+        self.application.member_cache[guild_id][self.user_id] = member
         self.application.destinations["guild"][guild_id] = [self.user_id]
         self.application.dispatch_event("guild_create", guild, index=guild_id, index_type="guild")
 

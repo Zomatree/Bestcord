@@ -5,7 +5,7 @@ import functools
 import ujson
 from typing import TypedDict, Any, Callable, Union, Literal
 
-from .errors import JsonErrors
+from .enums import JsonErrors
 from .route import RequestHandler
 
 class _OptionalSpec(TypedDict, total=False):

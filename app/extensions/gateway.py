@@ -1,4 +1,4 @@
-from app.utils import GatewayOps, GatewayErrors, WebSocketHandler, DB, Tokens, CustomError
+from app.utils import GatewayOps, GatewayErrors, WebSocketHandler, DB, Tokens, CustomError, Spec
 
 from typing import Optional, Any
 import datetime
@@ -7,39 +7,56 @@ import cerberus
 import asyncio
 import logging
 
-class Specs:
-    generic = cerberus.Validator({
-        "op": {
-            "type": "number",
-            "allowed": [0,1,2,3,4,5,6,7,9,10,11]
-        },
-        "d": {
-            "type": "dict",
-            "allow_unknown": True
-        }
-    })
 
-    identify = cerberus.Validator({
-        "token": {"type": "string"},
-        "intents": {"type": "number"},
-        "properties": {
-            "type": "dict",
-            "schema": {
-                "$os": {"type": "string"},
-                "$browser": {"type": "string"},
-                "$device": {"type": "string"}
-            }
+generic_spec: Spec = {
+    "op": {
+        "type": "number",
+        "allowed": [0,1,2,3,4,5,6,7,9,10,11]
+    },
+    "d": {
+        "type": "dict",
+        "allow_unknown": True
+    }
+}
+generic = cerberus.Validator(generic_spec, allow_unknown=True)
+
+identify_spec: Spec = {
+    "token": {"type": "string"},
+    "intents": {"type": "number"},
+    "properties": {
+        "type": "dict",
+        "allow_unknown": True,
+        "schema": {
+            "$os": {"type": "string"},
+            "$browser": {"type": "string"},
+            "$device": {"type": "string"}
         }
-    })
+    }
+}
+
+identify = cerberus.Validator(identify_spec, allow_unknown=True)
+
+member_chunk_spec: Spec = {
+    "guild_id": {"type": "string"},
+    "query": {"type": "string", "required": False, "excludes": "user_ids"},
+    "limit": {"type": "string", "dependencies": "query"},
+    "presences": {"type": "boolean", "required": False, "default": False},
+    "user_ids": {"type": "list", "schema": {"type": "string"}, "excludes": "query"},
+    "nonce": {"type": "string", "required": False}
+}
+
+member_chunk = cerberus.Validator(member_chunk_spec, allow_unknown=True)
 
 class Gateway(WebSocketHandler):
     last_heartbeat_ack: Optional[datetime.datetime]
 
     def initialize(self, database: DB, tokens: Tokens) -> None:
+        self.heartbeat_event = asyncio.Event()
         self.last_heartbeat_ack = datetime.datetime.utcnow()
-        self.identity = None
+        self.identitied = False
         self.user_id = None
         self.s = 0
+        self.guild_ids = []  # list of guild ids the user is in
         self.queue = asyncio.Queue[tuple[str, dict[str, Any]]]()
         self.heartbeat_interval = self.application.config["gateway"]["heartbeat_interval"]
         super().initialize(database, tokens)
@@ -61,22 +78,23 @@ class Gateway(WebSocketHandler):
         except:
             return self.close(GatewayErrors.decode_error, "Error decoding message.")
         
-        status: bool = Specs.generic.validate(data)  # type: ignore
-        if not status:
-            return self.close(GatewayErrors.decode_error, "Invalid message shape")
-    
-        if data["op"] != GatewayOps.identify and self.identity is None:
-            return self.close(GatewayErrors.not_authed, "No identify message sent")
+        # status: bool = generic.validate(data)  # type: ignore
+        payload = data["d"]
 
-        if data["op"] == GatewayOps.identify and self.identity is not None:
-            return self.close(GatewayErrors.already_authed, "Identify already sent")
+        #if not status:
+        #    return self.close(GatewayErrors.decode_error, "Invalid payload")
+
+            #if data["op"] != GatewayOps.identify and self.identitied is None:
+            #    return self.close(GatewayErrors.not_authed, "No identify message sent")
+
+            #elif data["op"] == GatewayOps.identify and self.identitied is not None:
+            #    return self.close(GatewayErrors.already_authed, "Identify already sent")
 
         if data["op"] == GatewayOps.identify:
-            status: bool = Specs.identify.validate(data["d"])  # type: ignore
+            status: bool = identify.validate(data["d"])  # type: ignore
             if not status:
-                return self.close(GatewayErrors.decode_error, "Invalid message shape")
+                return self.close(GatewayErrors.decode_error, "Invalid payload")
 
-            payload = data["d"]
             token = payload["token"]
 
             try:
@@ -85,22 +103,57 @@ class Gateway(WebSocketHandler):
                 return self.close(GatewayErrors.auth_failed, "Invalid token")
 
             self.intents = payload["intents"]
-
+            self.identitied = True
             self.application.gateway_connections[self.user_id] = self
 
             asyncio.create_task(self.dispatcher())
             asyncio.create_task(self.heartbeat_task())
 
-        if data["op"] == GatewayOps.heartbeat:
+        elif data["op"] == GatewayOps.heartbeat:
             self.last_heartbeat_ack = datetime.datetime.utcnow()
+            self.heartbeat_event.set()
+            await self.send_message(GatewayOps.heartbeat_ack, self.s)
+
+        elif data["op"] == GatewayOps.request_guild_members:
+            status: bool = member_chunk.validate(payload)  # type: ignore
+            if not status:
+                return self.close(GatewayErrors.decode_error, "Invalid message shape")
+
+            if (guild_id := payload["guild_id"]) not in self.guild_ids:
+                return
+
+            members = list(self.application.member_cache[guild_id].values())
+            chunks = [members[i:i+1000] for i in range(0, len(members), 1000)]
+            chunk_count = len(chunks)
+
+            for i, chunk in enumerate(chunks):
+                chunk = [member  | {"user": self.application.user_cache[member["id"]]} for member in chunk]
+
+                chunk_payload = {
+                    "guild_id": guild_id,
+                    "members": chunk,
+                    "chunk_index": i,
+                    "chunk_count": chunk_count,
+                    "presences": []
+                }
+
+                if (nonce := payload.get("nonce")):
+                    payload["nonce"] = nonce
+
+                self.push_event("guild_member_chunk", chunk_payload)
 
     async def heartbeat_task(self):
         sleep_interval = (self.heartbeat_interval * 1.25) / 1000
         delta = datetime.timedelta(seconds=sleep_interval)
 
         while True:
-            asyncio.sleep(sleep_interval)
-            if self.last_heartbeat_ack < datetime.datetime.utcnow() - delta:
+            await self.heartbeat_event.wait()
+            await asyncio.sleep(sleep_interval)
+            self.heartbeat_event.clear()
+
+            behind = self.last_heartbeat_ack < datetime.datetime.utcnow() - delta
+            
+            if behind:
                 self.close()
 
     def on_close(self):
@@ -111,7 +164,7 @@ class Gateway(WebSocketHandler):
     async def dispatcher(self):
         while True:
             event_name, payload = await self.queue.get()
-            await self.send_message(GatewayOps.dispatch, payload, s=self.s, t=event_name)
+            await self.send_message(GatewayOps.dispatch, payload, s=self.s, t=event_name.upper())
             self.s += 1
 
     def push_event(self, event_name: str, payload: dict[str, Any]):

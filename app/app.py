@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from tornado.web import Application, StaticFileHandler, RedirectHandler
+from tornado.web import Application, StaticFileHandler, RedirectHandler, RequestHandler
 import importlib
 import asyncio
 import logging
 from typing import Any, Protocol, runtime_checkable, Literal, get_args
+import contextlib
 
 from .utils import DB, TornadoUvloop, Tokens
 from .extensions.gateway import Gateway
@@ -18,6 +19,17 @@ class ExtensionProtocol(Protocol):
 destination_keys = Literal["guild", "channel"]
 logger: logging.Logger = logging.getLogger("app")
 
+class NotFound(RequestHandler):
+    def get(self, *_):
+        self.write('{"message": "404: not found", "code": 0}')
+    
+    post = get
+    delete = get
+    patch = get
+    put = get
+    options = get
+    head = get
+
 class App(Application):
     def __init__(self, database: DB, config: dict[str, Any]):
         self.database = database
@@ -29,8 +41,10 @@ class App(Application):
 
         self.args = {"database": self.database, "tokens": self.tokens}
         
-        self.gateway_connections: dict[str, Gateway] = {}  # id -> gateway
-        self.destinations: dict[destination_keys, dict[str, list[str]]] = {}  # type -> (id -> userid[])
+        self.gateway_connections: dict[str, Gateway] = {}  # userid -> gateway
+        self.destinations: dict[destination_keys, dict[str, list[str]]] = {}  # type -> id -> userid[]
+        self.member_cache: dict[str, dict[str, dict]] = {}  # guildid -> userid -> user
+        self.user_cache: dict[str, dict] = {}  # userid -> user
 
         for key in get_args(destination_keys):
             self.destinations[key] = {}
@@ -49,8 +63,8 @@ class App(Application):
             routes.extend(module_routes)
 
         routes.append(("/", RedirectHandler, {"url": "/index.html"}))
+        routes.append((f"/api/v{self.version}/(.*)", NotFound))
         routes.append(("/(.+)", StaticFileHandler, {"path": "./app/static"}))
-
         for route in routes:
             logging.info(f"Adding {route[0]}")
 
@@ -67,6 +81,7 @@ class App(Application):
         server = cls(db, config)
         
         loop.run_until_complete(server.fill_destinations())
+        loop.run_until_complete(server.fill_member_cache())
         
         server.listen(config["app"]["port"], config["app"]["address"])
         
@@ -81,7 +96,8 @@ class App(Application):
             return
 
         for id in users:
-            self.gateway_connections[id].push_event(event_name, payload)
+            with contextlib.suppress(KeyError):  # they are not online - ignore them
+                self.gateway_connections[id].push_event(event_name, payload)
 
     async def fill_destinations(self):
         async with self.database.accqire() as conn:
@@ -93,3 +109,28 @@ class App(Application):
 
         for channel in channels:
             self.destinations["channel"][channel["id"]] = self.destinations["guild"][channel["guild_id"]]  # ill switch this to permissions when i implement them, until then its the same as guilds
+
+    async def fill_member_cache(self):
+        async with self.database.accqire() as conn:
+            rows = await conn.fetch("select user_id, guild_members.guild_id, joined_at, deaf, mute, nick, username, discriminator from guild_members inner join users on guild_members.user_id = users.id")
+
+        for row in rows:
+            print(dict(row))
+
+            user = {
+                "username": row["username"],
+                "discriminator": row["discriminator"],
+                "id": row["user_id"],
+                "avatar": None
+            }
+
+            member = {
+                "id": row["user_id"],
+                "nick": row["nick"],
+                "mute": row["mute"],
+                "deaf": row["deaf"],
+                "joined_at": row["joined_at"]
+            }
+
+            self.user_cache[row["user_id"]] = user
+            self.member_cache.setdefault(row["guild_id"], {})[user["id"]] = member
