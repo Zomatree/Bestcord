@@ -1,0 +1,9 @@
+on: push
+jobs:
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: jakebailey/pyright-action@v1
+        inputs:
+          lib: true
+          python-version: 3.9.5
