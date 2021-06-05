@@ -5,6 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: jakebailey/pyright-action@v1
-        inputs:
+        with:
           lib: true
           python-version: 3.9.5
+          extra-args: "app"
