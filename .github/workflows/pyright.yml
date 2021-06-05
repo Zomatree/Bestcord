@@ -4,7 +4,7 @@ jobs:
   pyright:
     runs-on: ubuntu-latest
     steps:
-      - use: actions/checkout@v2
+      - uses: actions/checkout@v2
       - uses: jakebailey/pyright-action@v1
         with:
           lib: true
