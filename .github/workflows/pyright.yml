@@ -1,4 +1,5 @@
 on: push
+name: pyright
 jobs:
   pyright:
     runs-on: ubuntu-latest
