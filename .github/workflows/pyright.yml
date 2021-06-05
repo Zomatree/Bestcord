@@ -8,4 +8,3 @@ jobs:
         with:
           lib: true
           python-version: 3.9.5
-          extra-args: "app"
