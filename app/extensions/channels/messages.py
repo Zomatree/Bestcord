@@ -11,7 +11,7 @@ class Messages(RequestHandler):
     }, require_all=False)
     async def post(self, channel_id: str):
         content = self.body["content"]
-        embed_passed = "embed" in self.body  # type: ignore
+        embed_passed = "embed" in self.body
         tts = self.body["tts"]
         allowed_mentions = self.body["allowed_mentions"]
 

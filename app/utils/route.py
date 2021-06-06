@@ -26,7 +26,7 @@ class RequestHandler(BaseRequestHandler):
         self.tokens = tokens
         self.user_id: str = ""  # setting to an empty string instead of none makes my typing life easier
 
-        self.body: Optional[dict] = None
+        self.body: dict[str, Any]
 
     async def prepare(self) -> None:
         if self.request.method == "OPTIONS":
@@ -36,7 +36,7 @@ class RequestHandler(BaseRequestHandler):
             return
 
         try:
-            token: str = self.request.headers["Authorization"]
+            token: str = self.request.headers["Authorization"].replace("Bot ", "")
         except KeyError:
             return self.error(HTTPErrors.unauthorized, status_code=401)
             
@@ -86,7 +86,7 @@ class RequestHandler(BaseRequestHandler):
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
         self.set_header("Access-Control-Allow-Headers", "*")
-        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PATCH, PUT')
+        self.set_header("Access-Control-Allow-Methods", ", ".join(map(str.upper, self.SUPPORTED_METHODS)))
 
     @overload
     def get_query_argument(self, key: str, default: T) -> Union[str, T]:

@@ -54,9 +54,24 @@ class Generic(GenericSchema):
 _Spec = Union[Dict, Generic]
 Spec = dict[str, _Spec]
 
+# until cerberus 2.0 comes stable im using my own wrapper that the linter doesnt hate
+
+class Validator:
+    def __init__(self, spec, **kwargs):
+        self._validator = cerberus.Validator(spec, **kwargs)
+    
+    def validate(self, body: dict[str, Any]) -> bool:
+        return self._validator.validate(body)  # type: ignore
+    
+    def normalized(self, body: dict[str, Any]) -> dict[str, Any]:
+        return self._validator.normalized(body)  # type: ignore
+
+    @property
+    def errors(self) -> dict[str, Any]:
+        return self._validator.errors  # type: ignore
 
 def spec(spec: Spec, ignore_none_values: bool = False, allow_unknown: bool = False, require_all: bool = True, purge_unknown: bool = True, purge_readonly: bool = True) -> Callable:
-    validator = cerberus.Validator(spec, ignore_none_values=ignore_none_values, allow_unknown=allow_unknown, require_all=require_all, purge_unknown=purge_unknown, purge_readonly=purge_readonly)
+    validator = Validator(spec, ignore_none_values=ignore_none_values, allow_unknown=allow_unknown, require_all=require_all, purge_unknown=purge_unknown, purge_readonly=purge_readonly)
     
     def inner(f) -> Callable:
         @functools.wraps(f)
@@ -67,12 +82,14 @@ def spec(spec: Spec, ignore_none_values: bool = False, allow_unknown: bool = Fal
 
             body = ujson.loads(raw_body.decode())
 
-            status: bool = validator.validate(body)  # type: ignore
+            status = validator.validate(body)
 
             if not status:
-                return self.error(JsonErrors.general, **validator.errors)  # type: ignore
+                return self.error(JsonErrors.general, **validator.errors)
             
-            body = validator.normalized(body)  # type: ignore
+            body = validator.normalized(body)
+            if not body:
+                return self.error(JsonErrors.general, **validator.errors)
 
             self.body = body
             return await f(self, *args, **kwargs)

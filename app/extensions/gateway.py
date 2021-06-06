@@ -1,9 +1,8 @@
-from app.utils import GatewayOps, GatewayErrors, WebSocketHandler, DB, Tokens, CustomError, Spec
+from app.utils import GatewayOps, GatewayErrors, WebSocketHandler, DB, Tokens, CustomError, Spec, Validator
 
 from typing import Optional, Any
 import datetime
 import ujson
-import cerberus
 import asyncio
 import logging
 
@@ -18,7 +17,7 @@ generic_spec: Spec = {
         "allow_unknown": True
     }
 }
-generic = cerberus.Validator(generic_spec, allow_unknown=True)
+generic: Validator = Validator(generic_spec, allow_unknown=True)
 
 identify_spec: Spec = {
     "token": {"type": "string"},
@@ -34,18 +33,18 @@ identify_spec: Spec = {
     }
 }
 
-identify = cerberus.Validator(identify_spec, allow_unknown=True)
+identify: Validator = Validator(identify_spec, allow_unknown=True)
 
 member_chunk_spec: Spec = {
     "guild_id": {"type": "string"},
     "query": {"type": "string", "required": False, "excludes": "user_ids"},
     "limit": {"type": "string", "dependencies": "query"},
     "presences": {"type": "boolean", "required": False, "default": False},
-    "user_ids": {"type": "list", "schema": {"type": "string"}, "excludes": "query"},
+    # "user_ids": {"type": "list", "schema": {"type": "string"}},
     "nonce": {"type": "string", "required": False}
 }
 
-member_chunk = cerberus.Validator(member_chunk_spec, allow_unknown=True)
+member_chunk: Validator = Validator(member_chunk_spec, allow_unknown=True)
 
 class Gateway(WebSocketHandler):
     last_heartbeat_ack: Optional[datetime.datetime]
@@ -78,20 +77,20 @@ class Gateway(WebSocketHandler):
         except:
             return self.close(GatewayErrors.decode_error, "Error decoding message.")
         
-        # status: bool = generic.validate(data)  # type: ignore
+        # status: bool = generic.validate(data)
         payload = data["d"]
 
         #if not status:
         #    return self.close(GatewayErrors.decode_error, "Invalid payload")
 
-            #if data["op"] != GatewayOps.identify and self.identitied is None:
-            #    return self.close(GatewayErrors.not_authed, "No identify message sent")
+        #if data["op"] != GatewayOps.identify and self.identitied is None:
+        #    return self.close(GatewayErrors.not_authed, "No identify message sent")
 
-            #elif data["op"] == GatewayOps.identify and self.identitied is not None:
-            #    return self.close(GatewayErrors.already_authed, "Identify already sent")
+        #elif data["op"] == GatewayOps.identify and self.identitied is not None:
+        #    return self.close(GatewayErrors.already_authed, "Identify already sent")
 
         if data["op"] == GatewayOps.identify:
-            status: bool = identify.validate(data["d"])  # type: ignore
+            status: bool = identify.validate(data["d"])
             if not status:
                 return self.close(GatewayErrors.decode_error, "Invalid payload")
 
@@ -115,7 +114,7 @@ class Gateway(WebSocketHandler):
             await self.send_message(GatewayOps.heartbeat_ack, self.s)
 
         elif data["op"] == GatewayOps.request_guild_members:
-            status: bool = member_chunk.validate(payload)  # type: ignore
+            status: bool = member_chunk.validate(payload)
             if not status:
                 return self.close(GatewayErrors.decode_error, "Invalid message shape")
 

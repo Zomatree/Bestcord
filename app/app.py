@@ -17,10 +17,11 @@ class ExtensionProtocol(Protocol):
         raise NotImplementedError
 
 destination_keys = Literal["guild", "channel"]
-logger: logging.Logger = logging.getLogger("app")
+logger: logging.Logger = logging.getLogger()
 
 class NotFound(RequestHandler):
     def get(self, *_):
+        self.set_status(404)
         self.write('{"message": "404: not found", "code": 0}')
     
     post = get
@@ -37,7 +38,7 @@ class App(Application):
         self.version = config["version"]
 
         token_config: dict[str, Any] = config["tokens"]
-        self.tokens = Tokens(token_config["epoch"], token_config["worker_id"], token_config["process_id"], token_config["secret_key"])
+        self.tokens = Tokens(token_config["epoch"], token_config["worker_id"], token_config["process_id"], token_config["secret_key"], token_config["invite_length"])
 
         self.args = {"database": self.database, "tokens": self.tokens}
         
@@ -80,9 +81,8 @@ class App(Application):
         db = loop.run_until_complete(DB.from_args(config["database"]))
         server = cls(db, config)
         
-        loop.run_until_complete(server.fill_destinations())
-        loop.run_until_complete(server.fill_member_cache())
-        
+        loop.run_until_complete(server.startup())
+       
         server.listen(config["app"]["port"], config["app"]["address"])
         
         print(f"running at http://{config['app']['address']}:{config['app']['port']}")
@@ -112,16 +112,14 @@ class App(Application):
 
     async def fill_member_cache(self):
         async with self.database.accqire() as conn:
-            rows = await conn.fetch("select user_id, guild_members.guild_id, joined_at, deaf, mute, nick, username, discriminator from guild_members inner join users on guild_members.user_id = users.id")
+            rows = await conn.fetch("select user_id, guild_members.guild_id, joined_at, deaf, mute, nick, username, discriminator, avatar from guild_members inner join users on guild_members.user_id = users.id")
 
         for row in rows:
-            print(dict(row))
-
             user = {
                 "username": row["username"],
                 "discriminator": row["discriminator"],
                 "id": row["user_id"],
-                "avatar": None
+                "avatar": row["avatar"]
             }
 
             member = {
@@ -129,8 +127,13 @@ class App(Application):
                 "nick": row["nick"],
                 "mute": row["mute"],
                 "deaf": row["deaf"],
-                "joined_at": row["joined_at"]
+                "joined_at": row["joined_at"],
+                "roles": []
             }
 
             self.user_cache[row["user_id"]] = user
             self.member_cache.setdefault(row["guild_id"], {})[user["id"]] = member
+
+    async def startup(self):
+        await self.fill_destinations()
+        await self.fill_member_cache()

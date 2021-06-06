@@ -1,5 +1,6 @@
 
-from app.utils import spec, RequestHandler, JsonErrors, now
+from app.utils import spec, RequestHandler, JsonErrors
+import datetime
 
 
 class Guild(RequestHandler):
@@ -46,13 +47,14 @@ class Guild(RequestHandler):
         explicit_content_filter = self.body["explicit_content_filter"]
 
         guild_id = self.tokens.create_id()
-        now = now()
+        now = datetime.datetime.utcnow().isoformat()
 
         async with self.database.accqire() as conn:
             guild = await conn.fetchrow("insert into guilds(name, id, owner_id, verification_level, default_message_notifications, explicit_content_filter) values($1, $2, $3, $4, $5, $6) returning *",
                                         name, guild_id, self.user_id, verification_level, default_message_notifications, explicit_content_filter)
 
-            member = await conn.fetch("insert into guild_members(user_id, guild_id, joined_at) values ($1, $2, $3) returning *", self.user_id, guild_id, now)
+            member = await conn.fetchrow("insert into guild_members(user_id, guild_id, joined_at) values ($1, $2, $3) returning *", self.user_id, guild_id, now)
+            user = await self.database.get_user(self.user_id, conn=conn)
 
         # TODO: do roles and channels
 
@@ -62,6 +64,10 @@ class Guild(RequestHandler):
 
         self.write(dict(guild))  # type: ignore
         self.flush()
+
+        member = dict(member)  # type: ignore
+        member["user"] = user
+        member["roles"] = []
 
         guild["members"] = [member]
         guild["voice_states"] = []
@@ -78,7 +84,7 @@ class Guild(RequestHandler):
             "joined_at": now
         }
 
-        self.application.member_cache[guild_id][self.user_id] = member
+        self.application.member_cache[guild_id] = {self.user_id: member}
         self.application.destinations["guild"][guild_id] = [self.user_id]
         self.application.dispatch_event("guild_create", guild, index=guild_id, index_type="guild")
 

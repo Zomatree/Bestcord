@@ -1,7 +1,7 @@
 from .database import DB, now
 from .errors import CustomError
 from .route import RequestHandler, WebSocketHandler
-from .validator import spec, Spec
+from .validator import spec, Spec, Validator
 from .loop import TornadoUvloop
 from .token import Tokens
 from .enums import ChannelType, GatewayErrors, GatewayOps, JsonErrors, HTTPErrors, MessageTypes

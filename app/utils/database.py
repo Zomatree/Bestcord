@@ -4,10 +4,11 @@ import asyncpg
 import contextlib
 import argon2
 import ujson
-from typing import Any
+from typing import Any, Optional, cast
 import datetime
 
 from .errors import CustomError
+from .misc import filter_channel_keys
 
 all_discrims: set[str] = set(str(d).rjust(4, "0") for d in range(1, 1000))
 
@@ -19,8 +20,8 @@ class DB:
         self.pool = pool
         self.hasher = argon2.PasswordHasher()
 
-    @classmethod
-    async def connection_init(cls, connection: asyncpg.Connection) -> asyncpg.Connection:
+    @staticmethod
+    async def connection_init(connection: asyncpg.Connection) -> asyncpg.Connection:
         await connection.set_type_codec("json", encoder=ujson.dumps, decoder=ujson.loads, schema="pg_catalog")
         return connection
 
@@ -31,11 +32,25 @@ class DB:
         return cls(pool)
 
     @contextlib.asynccontextmanager
-    async def accqire(self):
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                conn: asyncpg.Connection
+    async def accqire(self, conn: Optional[asyncpg.Connection] = None):
+        release = True
+
+        try:
+            if conn is None:
+                conn = cast(asyncpg.Connection, await self.pool.acquire())
+            else:
+                release = False  # we are already in a context manager so i wont release it here
+
+            transaction = conn.transaction()
+            if transaction._managed:
+
                 yield conn
+            else:
+                async with transaction:
+                    yield conn
+        finally:
+            if release:
+                await self.pool.release(conn)
 
     async def create_account(self, username: str, email: str, password: str, id: str) -> dict[str, Any]:
         async with self.accqire() as conn:
@@ -74,3 +89,49 @@ class DB:
                 row["user_settings"] = dict(user_settings)  # type: ignore
 
             return row
+
+    async def get_channel(self, channel_id: str, *, conn: Optional[asyncpg.Connection] = None, partial: bool = False) -> dict[str, Any]:
+        if partial:
+            columns = "id, name, type"
+        else:
+            columns = "*"
+
+        async with self.accqire(conn) as conn:
+            row = await conn.fetchrow(f"select {columns} from guild_channels where id=$1", channel_id)
+        
+        if not row:
+            raise CustomError
+        
+        return filter_channel_keys(row)
+
+    async def get_guild(self, guild_id: str, *, conn: Optional[asyncpg.Connection] = None, partial: bool = False) -> dict[str, Any]:
+        if partial:
+            columns = "id, name, splash, banner, description, icon, features, verification_level, vanity_url_code, nsfw"
+        else:
+            columns = "*"
+
+        async with self.accqire(conn) as conn:
+            row = await conn.fetchrow(f"select {columns} from guilds where id=$1", guild_id)
+        
+        if not row:
+            raise CustomError
+        
+        return dict(row)
+
+    async def get_guild_id_from_channel_id(self, channel_id: str, *, conn: Optional[asyncpg.Connection] = None) -> str:
+        async with self.accqire(conn) as conn:
+            guild_id: Optional[str] = await conn.fetchval("select guild_id from guild_channels where id=$1", channel_id)
+            
+            if not guild_id:
+                raise CustomError
+            
+            return guild_id
+
+    async def get_user(self, user_id: str, *, conn: Optional[asyncpg.Connection] = None) -> dict[str, Any]:
+        async with self.accqire(conn) as conn:
+            user = await conn.fetchrow("select username, discriminator, id, avatar from users where id=$1", user_id)
+
+        if not user:
+            raise CustomError
+
+        return dict(user)

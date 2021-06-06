@@ -1,13 +1,18 @@
 import time
 import itsdangerous
 import base64
+import string
+import secrets
+
+invite_chars: list[str] = list(string.ascii_letters + "1234567890")
 
 class Tokens:
-    def __init__(self, epoch: int, worker_id: int, process_id: int, secret: str):
+    def __init__(self, epoch: int, worker_id: int, process_id: int, secret: str, invite_length: int):
         self.epoch = epoch
         self.worker_id = worker_id
         self.process_id = process_id
         self.secret = secret
+        self.invite_length = invite_length
 
         self.inc = 0
         self.signer = itsdangerous.TimestampSigner(secret)
@@ -37,3 +42,7 @@ class Tokens:
 
         encoded_id = id.decode()
         return base64.b64decode(encoded_id).decode()
+
+    def generate_invite_code(self) -> str:
+        chars = [secrets.choice(invite_chars) for _ in range(self.invite_length)]
+        return "".join(chars)
