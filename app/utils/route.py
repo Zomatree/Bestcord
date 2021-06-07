@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from tornado.web import RequestHandler as BaseRequestHandler
 from tornado.websocket import WebSocketHandler as BaseWebSocketHandler, WebSocketClosedError
+from tornado.concurrent import Future
+
 import ujson
 
 from typing import Tuple, Optional, Callable, Awaitable, TYPE_CHECKING, Union, Dict, Any, TypeVar, Optional, overload
@@ -59,8 +61,7 @@ class RequestHandler(BaseRequestHandler):
 
         self.set_status(status_code)
         self.add_header("Content-Type", "application/json")
-        self.write(ujson.dumps(body))
-        self.finish()
+        self.finish(body)
 
     def write(self, body: Union[str, bytes, dict, list]) -> None:
         if isinstance(body, (dict, list)):
@@ -102,6 +103,10 @@ class RequestHandler(BaseRequestHandler):
         except KeyError:
             return default
 
+    # our custom .write takes a list as well so we need to modify .finish's signature to take it too
+
+    def finish(self, chunk: Optional[Union[str, bytes, dict, list]] = None) -> "Future[None]":
+        return super().finish(chunk)  # type: ignore
 
 class WebSocketHandler(BaseWebSocketHandler):
     application: App

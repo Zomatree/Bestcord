@@ -22,7 +22,7 @@ logger: logging.Logger = logging.getLogger()
 class NotFound(RequestHandler):
     def get(self, *_):
         self.set_status(404)
-        self.write('{"message": "404: not found", "code": 0}')
+        self.finish('{"message": "404: not found", "code": 0}')
     
     post = get
     delete = get

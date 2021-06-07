@@ -3,11 +3,11 @@ from app.utils import spec, RequestHandler
 
 class GetGateway(RequestHandler, require_token=False):
     async def get(self):
-        self.write({"url": f"ws://{self.application.config['app']['public_url']}/api/v{self.application.version}/gateway/connect"})
+        self.finish({"url": f"ws://{self.application.config['app']['public_url']}/api/v{self.application.version}/gateway/connect"})
 
 class GetBotGateway(RequestHandler):
     async def get(self):
-        self.write({
+        self.finish({
             "url": f"ws://{self.application.config['app']['public_url']}/api/v{self.application.version}/gateway/connect",
             "shards": 1,  # haha sharding go brrr
             "session_start_limit": {

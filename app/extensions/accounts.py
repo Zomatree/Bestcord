@@ -13,8 +13,7 @@ class Accounts(RequestHandler, require_token=False):
         except CustomError:
             return self.error(JsonErrors.invalid_form, email="Email is already registered.")
 
-        self.write(account)
-        self.flush()
+        self.finish(account)
 
 
 def setup(app):

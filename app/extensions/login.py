@@ -14,8 +14,7 @@ class Login(RequestHandler, require_token=False):
 
         token = self.tokens.create_token(account["id"])
 
-        self.write({"token": token, "user_settings": account["user_settings"]})
-        self.flush()
+        self.finish({"token": token, "user_settings": account["user_settings"]})
 
 def setup(app):
     return [(f"/api/v{app.version}/login", Login, app.args)]

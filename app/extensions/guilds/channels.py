@@ -43,8 +43,7 @@ class Channels(RequestHandler):
 
         channel = filter_channel_keys(dict(channel))  # type: ignore
 
-        self.write(channel)
-        self.flush()
+        self.finish(channel)
 
         self.application.destinations["channel"][id] = self.application.destinations["guild"][guild_id]  # dont have permissions done yet so this is a botch fix
 
@@ -56,7 +55,7 @@ class Channels(RequestHandler):
         
         channels = [filter_channel_keys(dict(channel)) for channel in channels]
 
-        self.write(channels)
+        self.finish(channels)
 
 class ChannelID(RequestHandler):
     async def delete(self, channel_id: str):

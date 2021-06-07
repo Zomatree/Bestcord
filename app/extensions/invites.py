@@ -8,8 +8,7 @@ class Invites(RequestHandler):
 
         invite = await self.database.get_invite(invite_code, with_counts=with_counts, with_expiration=with_expiration)
 
-        self.write(invite)
-        self.flush()
+        self.finish(invite)
 
     async def delete(self, invite_code: str):
         async with self.database.accqire() as conn:
@@ -29,8 +28,7 @@ class Invites(RequestHandler):
             "inviter": user,
         }
 
-        self.write(payload)
-        self.flush()
+        self.finish(payload)
 
 def setup(app):
     return [(f"/api/v{app.version}/invites/(.+)", Invites, app.args)]

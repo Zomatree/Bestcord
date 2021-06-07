@@ -61,8 +61,7 @@ class Invites(RequestHandler):
             "expires_at": expires_at.isoformat()
         }
 
-        self.write(payload)
-        self.flush()
+        self.finish(payload)
 
         payload["guild_id"] = payload.pop("guild")["id"]
         payload["channel_id"] = payload.pop("channel")["id"]

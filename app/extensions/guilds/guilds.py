@@ -62,8 +62,7 @@ class Guild(RequestHandler):
         guild["roles"] = []
         guild["emojis"] = []
 
-        self.write(dict(guild))  # type: ignore
-        self.flush()
+        self.finish(dict(guild))  # type: ignore
 
         member = dict(member)  # type: ignore
         member["user"] = user
@@ -96,8 +95,7 @@ class GuildID(RequestHandler):
             if guild is None:
                 return self.error(JsonErrors.missing_key, 403)
 
-        self.write(dict(guild))
-        self.flush()
+        self.finish(dict(guild))
 
     @spec({
         "name": {"type": "string", "maxlength": 100, "minlength": 2},
@@ -124,7 +122,7 @@ class GuildID(RequestHandler):
 
         new_guild = dict(new_guild)  # type: ignore
 
-        self.write(new_guild)
+        self.finish(new_guild)
         self.application.dispatch_event("guild_update", new_guild, index=guild_id, index_type="guild")
 
     async def delete(self, guild_id: str) -> None:

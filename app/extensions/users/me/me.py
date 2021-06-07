@@ -8,8 +8,7 @@ class Me(RequestHandler):
 
         user = dict(row)  # type: ignore
 
-        self.write(user)
-        self.flush()
+        self.finish(user)
 
 def setup(app):
     return [(f"/api/v{app.version}/users/@me", Me, app.args)]

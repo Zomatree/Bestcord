@@ -50,8 +50,7 @@ class Messages(RequestHandler):
         if allowed_mentions is not None:
             message["allowed_mentions"] = allowed_mentions
 
-        self.write(message)
-        self.flush()
+        self.finish(message)
 
         message["author"] = self.application.user_cache[self.user_id]
         message["member"] = self.application.member_cache[guild_id][self.user_id]  # type: ignore
@@ -66,8 +65,7 @@ class Messages(RequestHandler):
         async with self.database.accqire() as conn:
             messages = await conn.fetch("select * from messages where channel_id=$1 order by id desc limit $2", channel_id, limit)
         
-        self.write(messages)
-        self.flush()
+        self.finish(messages)
 
 def setup(app):
     return [(f"/api/v{app.version}/channels/(.+)/messages", Messages, app.args)]
