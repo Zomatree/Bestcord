@@ -135,3 +135,28 @@ class DB:
             raise CustomError
 
         return dict(user)
+
+    async def get_invite(self, invite_code, *, conn: Optional[asyncpg.Connection] = None, with_counts: bool = False, with_expiration: bool = False) -> dict[str, Any]:
+        # todo: actually do something with with_counts
+
+        async with self.accqire(conn) as conn:
+            invite = await conn.fetchrow(f"select channel_id, guild_id, inviter_id {', expires_at' if with_expiration else ''} from guild_invites where code=$1", invite_code)
+
+            if not invite:
+                raise CustomError
+
+            guild = await self.get_guild(invite["guild_id"], partial=True)
+            channel = await self.get_channel(invite["channel_id"], partial=True)
+            user = await self.get_user(invite["inviter_id"])
+
+        payload = {
+            "code": invite_code,
+            "guild": guild,
+            "channel": channel,
+            "inviter": user,
+        }
+
+        if with_expiration:
+            payload["expires_at"] = invite["expires_at"]
+
+        return payload
