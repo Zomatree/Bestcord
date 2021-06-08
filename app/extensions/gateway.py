@@ -6,14 +6,12 @@ import ujson
 import asyncio
 import logging
 
-
 generic_spec: Spec = {
     "op": {
         "type": "number",
-        "allowed": [0,1,2,3,4,5,6,7,9,10,11]
+        "allowed": [0,1,2,3,4,5,6,7,9,10,11,12]
     },
     "d": {
-        "type": "dict",
         "allow_unknown": True,
         "nullable": True
     }
@@ -59,6 +57,7 @@ class Gateway(WebSocketHandler):
         self.guild_ids = []  # list of guild ids the user is in
         self.queue = asyncio.Queue[tuple[str, Any]]()
         self.heartbeat_interval = self.application.config["gateway"]["heartbeat_interval"]
+        self.gateway_version = self.application.config["gateway"]["version"]
         super().initialize(database, tokens)
 
     async def open(self):
@@ -88,11 +87,11 @@ class Gateway(WebSocketHandler):
 
         payload = data["d"]
 
-        if data["op"] != GatewayOps.identify and self.identitied is None:
-            return self.close(GatewayErrors.not_authed, "No identify message sent")
+        #if data["op"] != GatewayOps.identify and self.identitied is None:
+        #    return self.close(GatewayErrors.not_authed, "No identify message sent")
 
-        elif data["op"] == GatewayOps.identify and self.identitied is not None:
-            return self.close(GatewayErrors.already_authed, "Identify already sent")
+        #elif data["op"] == GatewayOps.identify and self.identitied is not None:
+        #    return self.close(GatewayErrors.already_authed, "Identify already sent")
 
         if data["op"] == GatewayOps.identify:
             status: bool = identify.validate(data["d"])
@@ -112,6 +111,28 @@ class Gateway(WebSocketHandler):
 
             asyncio.create_task(self.dispatcher())
             asyncio.create_task(self.heartbeat_task())
+
+            async with self.database.accqire() as conn:
+                rows = await conn.fetch("select guild_id from guild_members where user_id=$1", self.user_id)
+                guild_ids = [row["guild_id"] for row in rows]
+            
+
+                ready = {
+                    "v": self.gateway_version,
+                    "user": await self.database.get_user(self.user_id),
+                    "guilds": [{"id": id, "unavailable": True} for id in guild_ids],
+                    "session_id": 0,  # will do this eventually
+                    "application": {
+                        "id": self.user_id,
+                        "flags": 0
+                    }
+                }
+
+                self.push_event("ready", ready)
+
+                for guild_id in guild_ids:
+                    guild = await self.database.get_guild(guild_id, conn=conn, extra_info=True)
+                    self.push_event("guild_create", guild)
 
         elif data["op"] == GatewayOps.heartbeat:
             self.last_heartbeat_ack = datetime.datetime.utcnow()

@@ -136,7 +136,7 @@ class DB:
                     user_id = member.pop("user_id")
                     user = await self.get_user(user_id)
                     roles = await conn.fetch("select id, name, color, hoist, position, permissions, managed, mentionable from member_roles inner join guild_roles on member_roles.user_id=guild_roles.id where member_roles.user_id=$1", user_id)
-                    members.append({**member, "user": user})
+                    members.append({**member, "user": user, "roles": [dict(role) for role in roles]})
 
                 guild["members"] = members
 
