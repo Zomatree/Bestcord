@@ -88,16 +88,22 @@ class App(Application):
         print(f"running at http://{config['app']['address']}:{config['app']['port']}")
         TornadoUvloop.current().start()
 
-    def dispatch_event(self, event_name: str, payload: dict[str, Any], *, index: str, index_type: destination_keys):
+    def dispatch_event(self, event_name: str, payload: Any, *, index: str, index_type: destination_keys):
         users = self.destinations[index_type].get(index)
+        logging.debug(users)
 
         if users is None:
-            logging.debug(f"Ignoring event %s with index %s:%s", event_name, index, index_type)
+            logging.debug("Ignoring event %s with index %s:%s", event_name, index, index_type)
             return
 
-        for id in users:
-            with contextlib.suppress(KeyError):  # they are not online - ignore them
-                self.gateway_connections[id].push_event(event_name, payload)
+        logger.debug("Dispatching event %s with index %s:%s", event_name, index, index_type)
+        for user_id in users:
+            self.send_event(event_name, user_id, payload)
+
+    def send_event(self, event_name: str, user_id: str, payload: Any):
+        with contextlib.suppress(KeyError):  # they are not online - ignore them
+            self.gateway_connections[user_id].push_event(event_name, payload)
+
 
     async def fill_destinations(self):
         async with self.database.accqire() as conn:

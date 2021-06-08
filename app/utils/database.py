@@ -104,7 +104,10 @@ class DB:
         
         return filter_channel_keys(row)
 
-    async def get_guild(self, guild_id: str, *, conn: Optional[asyncpg.Connection] = None, partial: bool = False) -> dict[str, Any]:
+    async def get_guild(self, guild_id: str, *, conn: Optional[asyncpg.Connection] = None, partial: bool = False, extra_info: bool = False) -> dict[str, Any]:
+        if extra_info:
+            partial = True
+
         if partial:
             columns = "id, name, splash, banner, description, icon, features, verification_level, vanity_url_code, nsfw"
         else:
@@ -112,11 +115,32 @@ class DB:
 
         async with self.accqire(conn) as conn:
             row = await conn.fetchrow(f"select {columns} from guilds where id=$1", guild_id)
+
+            if not row:
+                raise CustomError
+
+            guild = dict(row)
+
+            if extra_info:
+                channels = await conn.fetch("select * from guild_channels where guild_id=$1", guild_id)
+                guild["channels"] = [filter_channel_keys(channel) for channel in channels]
+
+                roles = await conn.fetch("select id, name, color, hoist, position, permissions, managed, mentionable from guild_roles where guild_id=$1", guild_id)
+                guild["roles"] = [dict(role) for role in roles]
         
-        if not row:
-            raise CustomError
-        
-        return dict(row)
+                member_rows = await conn.fetch("select user_id, joined_at, deaf, mute, pending, nick from guild_members where guild_id=$1", guild_id)
+                members = []
+
+                for row in member_rows:
+                    member = dict(row)
+                    user_id = member.pop("user_id")
+                    user = await self.get_user(user_id)
+                    roles = await conn.fetch("select id, name, color, hoist, position, permissions, managed, mentionable from member_roles inner join guild_roles on member_roles.user_id=guild_roles.id where member_roles.user_id=$1", user_id)
+                    members.append({**member, "user": user})
+
+                guild["members"] = members
+
+        return guild
 
     async def get_guild_id_from_channel_id(self, channel_id: str, *, conn: Optional[asyncpg.Connection] = None) -> str:
         async with self.accqire(conn) as conn:

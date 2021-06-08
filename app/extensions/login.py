@@ -18,4 +18,3 @@ class Login(RequestHandler, require_token=False):
 
 def setup(app):
     return [(f"/api/v{app.version}/login", Login, app.args)]
-
