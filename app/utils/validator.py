@@ -37,16 +37,12 @@ class _OptionalSpec(TypedDict, total=False):
     default_setter: Callable[["Spec"], Any]
     coerce: Callable[[Any], Any]
 
-class DictSchema(_OptionalSpec, total=False):
+class Dict(_OptionalSpec, total=False):
     schema: Spec
-
-class Dict(DictSchema):
     type: Literal["dict"]
 
-class GenericSchema(_OptionalSpec, total=False):
+class Generic(_OptionalSpec, total=False):
     schema: _Spec
-
-class Generic(GenericSchema):
     type: str
 
 # dict takes a differant schema that regular 

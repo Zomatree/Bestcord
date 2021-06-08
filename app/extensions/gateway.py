@@ -14,7 +14,8 @@ generic_spec: Spec = {
     },
     "d": {
         "type": "dict",
-        "allow_unknown": True
+        "allow_unknown": True,
+        "nullable": True
     }
 }
 generic: Validator = Validator(generic_spec, allow_unknown=True)
@@ -56,7 +57,7 @@ class Gateway(WebSocketHandler):
         self.user_id = None
         self.s = 0
         self.guild_ids = []  # list of guild ids the user is in
-        self.queue = asyncio.Queue[tuple[str, dict[str, Any]]]()
+        self.queue = asyncio.Queue[tuple[str, Any]]()
         self.heartbeat_interval = self.application.config["gateway"]["heartbeat_interval"]
         super().initialize(database, tokens)
 
@@ -77,17 +78,21 @@ class Gateway(WebSocketHandler):
         except:
             return self.close(GatewayErrors.decode_error, "Error decoding message.")
         
-        # status: bool = generic.validate(data)
+        logging.debug("Received payload: %s", data)
+
+        status: bool = generic.validate(data)
+
+        if not status:
+            logging.debug(generic.errors)
+            return self.close(GatewayErrors.decode_error, "Invalid payload")
+
         payload = data["d"]
 
-        #if not status:
-        #    return self.close(GatewayErrors.decode_error, "Invalid payload")
+        if data["op"] != GatewayOps.identify and self.identitied is None:
+            return self.close(GatewayErrors.not_authed, "No identify message sent")
 
-        #if data["op"] != GatewayOps.identify and self.identitied is None:
-        #    return self.close(GatewayErrors.not_authed, "No identify message sent")
-
-        #elif data["op"] == GatewayOps.identify and self.identitied is not None:
-        #    return self.close(GatewayErrors.already_authed, "Identify already sent")
+        elif data["op"] == GatewayOps.identify and self.identitied is not None:
+            return self.close(GatewayErrors.already_authed, "Identify already sent")
 
         if data["op"] == GatewayOps.identify:
             status: bool = identify.validate(data["d"])
