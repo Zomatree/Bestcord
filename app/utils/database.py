@@ -134,9 +134,9 @@ class DB:
                 for row in member_rows:
                     member = dict(row)
                     user_id = member.pop("user_id")
-                    user = await self.get_user(user_id)
-                    roles = await conn.fetch("select id, name, color, hoist, position, permissions, managed, mentionable from member_roles inner join guild_roles on member_roles.user_id=guild_roles.id where member_roles.user_id=$1", user_id)
-                    members.append({**member, "user": user, "roles": [dict(role) for role in roles]})
+                    member["user"] = await self.get_user(user_id)
+                    member["roles"] = await self.get_member_roles(user_id, guild_id)
+                    members.append(member)
 
                 guild["members"] = members
 
@@ -184,3 +184,9 @@ class DB:
             payload["expires_at"] = invite["expires_at"]
 
         return payload
+
+    async def get_member_roles(self, member_id: str, guild_id: str, *, conn: Optional[asyncpg.Connection] = None) -> list[dict[str, Any]]:
+        async with self.accqire(conn) as conn:
+            rows = await conn.fetch("select id, name, color, hoist, position, permissions, managed, mentionable from guild_roles inner join member_roles on member_roles.user_id=guild_roles.id where member_roles.user_id=$1 and member_roles.guild_id=$2", member_id, guild_id)
+
+        return [dict(row) for row in rows]

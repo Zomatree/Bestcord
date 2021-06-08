@@ -19,6 +19,7 @@ class JsonErrors:
 
     unknown_channel: tup = (10003, "Uknown Channel")
     unknown_invite: tup = (10006, "Unknown Invite")
+    unknown_user: tup = (10013, "Unknown User")
 
     missing_access: tup = (50001, "Missing Acess")
     invalid_form: tup = (50035, "Invalid Form Body")
