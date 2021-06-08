@@ -58,6 +58,8 @@ class Gateway(WebSocketHandler):
         self.queue = asyncio.Queue[tuple[str, Any]]()
         self.heartbeat_interval = self.application.config["gateway"]["heartbeat_interval"]
         self.gateway_version = self.application.config["gateway"]["version"]
+        self.started_at = datetime.datetime.utcnow()
+        self.sleep_interval = (self.heartbeat_interval * 1.25) / 1000
         super().initialize(database, tokens)
 
     async def open(self):
@@ -87,11 +89,11 @@ class Gateway(WebSocketHandler):
 
         payload = data["d"]
 
-        #if data["op"] != GatewayOps.identify and self.identitied is None:
-        #    return self.close(GatewayErrors.not_authed, "No identify message sent")
+        if data["op"] != GatewayOps.identify and self.identitied is False and (self.started_at + datetime.timedelta(seconds=self.sleep_interval) < datetime.datetime.utcnow()):
+            return self.close(GatewayErrors.not_authed, "No identify message sent")
 
-        #elif data["op"] == GatewayOps.identify and self.identitied is not None:
-        #    return self.close(GatewayErrors.already_authed, "Identify already sent")
+        elif data["op"] == GatewayOps.identify and self.identitied is not False:
+            return self.close(GatewayErrors.already_authed, "Identify already sent")
 
         if data["op"] == GatewayOps.identify:
             status: bool = identify.validate(data["d"])
@@ -168,12 +170,11 @@ class Gateway(WebSocketHandler):
                 self.push_event("guild_member_chunk", chunk_payload)
 
     async def heartbeat_task(self):
-        sleep_interval = (self.heartbeat_interval * 1.25) / 1000
-        delta = datetime.timedelta(seconds=sleep_interval)
+        delta = datetime.timedelta(seconds=self.sleep_interval)
 
         while True:
             await self.heartbeat_event.wait()
-            await asyncio.sleep(sleep_interval)
+            await asyncio.sleep(self.sleep_interval)
             self.heartbeat_event.clear()
 
             behind = self.last_heartbeat_ack < datetime.datetime.utcnow() - delta
