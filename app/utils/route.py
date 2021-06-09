@@ -32,7 +32,7 @@ class RequestHandler(BaseRequestHandler):
         self.tokens = tokens
         self.user_id: str = ""  # setting to an empty string instead of none makes my typing life easier
 
-        self.body: dict[str, Any]
+        self.body: JsonType
 
     async def prepare(self) -> None:
         if self.request.method == "OPTIONS":
