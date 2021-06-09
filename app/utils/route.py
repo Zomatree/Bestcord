@@ -6,19 +6,15 @@ from tornado.concurrent import Future
 
 import ujson
 
-from typing import Optional, Callable, Awaitable, TYPE_CHECKING, Union, Any, TypeVar, Optional, overload
+from typing import Tuple, Optional, Callable, Awaitable, TYPE_CHECKING, Union, Dict, Any, TypeVar, Optional, overload
 
-from .enums import HTTPErrors, JsonErrors
+from .enums import HTTPErrors
 
 if TYPE_CHECKING:
     from app.app import App
     from .database import DB
     from .token import Tokens
     T = TypeVar("T")
-
-    DictJsonTypeValues = Union[str, float, int, None, "JsonType", list["JsonType"]]
-    DictJsonType = dict[str, DictJsonTypeValues]
-    JsonType = Union[list["JsonType"], DictJsonType]
 
 class RequestHandler(BaseRequestHandler):
     require_token: bool
@@ -32,7 +28,7 @@ class RequestHandler(BaseRequestHandler):
         self.tokens = tokens
         self.user_id: str = ""  # setting to an empty string instead of none makes my typing life easier
 
-        self.body: JsonType
+        self.body: dict[str, Any]
 
     async def prepare(self) -> None:
         if self.request.method == "OPTIONS":
@@ -51,12 +47,12 @@ class RequestHandler(BaseRequestHandler):
         except:
             return self.error(HTTPErrors.unauthorized, status_code=401)
 
-    def error(self, code: tuple[int, str], status_code: int = 400, **kwargs: Any) -> None:
+    def error(self, code: Tuple[int, str], status_code: int = 400, **kwargs: Any) -> None:
         return self.send_error(status_code, code=code[0], message=code[1], **kwargs)
 
-    def write_error(self, status_code: int, **kwargs: DictJsonTypeValues):
+    def write_error(self, status_code: int, **kwargs: Any):
         try:
-            body: JsonType = {"code": kwargs.pop("code"), "message": kwargs.pop("message")}
+            body = {"code": kwargs.pop("code"), "message": kwargs.pop("message")}
             if kwargs:
                 body["errors"] = kwargs
 
@@ -67,7 +63,7 @@ class RequestHandler(BaseRequestHandler):
         self.add_header("Content-Type", "application/json")
         self.finish(body)
 
-    def write(self, body: Union[str, bytes, JsonType]) -> None:
+    def write(self, body: Union[str, bytes, dict, list]) -> None:
         if isinstance(body, (dict, list)):
             self.set_header("Content-Type", "application/json")
             body = ujson.dumps(body)
@@ -109,16 +105,16 @@ class RequestHandler(BaseRequestHandler):
 
     # our custom .write takes a list as well so we need to modify .finish's signature to take it too
 
-    def finish(self, chunk: Optional[Union[str, bytes, JsonType]] = None) -> "Future[None]":
+    def finish(self, chunk: Optional[Union[str, bytes, dict, list]] = None) -> "Future[None]":
         return super().finish(chunk)  # type: ignore
 
 class WebSocketHandler(BaseWebSocketHandler):
     application: App
 
-    async def write_message(self, message: Union[bytes, str, JsonType], binary: bool = False) -> None:
+    async def write_message(self, message: Union[bytes, str, Dict[str, Any]], binary: bool = False) -> None:
         if self.ws_connection is None or self.ws_connection.is_closing():
             raise WebSocketClosedError()
-        if isinstance(message, (dict, list)):
+        if isinstance(message, dict):
             message = ujson.dumps(message)
         return await self.ws_connection.write_message(message, binary=binary)
 
@@ -127,6 +123,7 @@ class WebSocketHandler(BaseWebSocketHandler):
         self.tokens = tokens
         self.user_id = None
 
-    async def send_message(self, op: int, d: JsonType, *, s: int = None, t: str = None) -> None:
-        payload: JsonType = {"op": op, "d": d, "s": s, "t": t}
-        return await self.write_message(payload)
+        self.body: Optional[dict] = None
+
+    async def send_message(self, op: int, d: Any, *, s: int = None, t: str = None) -> None:
+        return await self.write_message({"op": op, "d": d, "s": s, "t": t})

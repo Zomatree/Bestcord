@@ -3,13 +3,10 @@ from __future__ import annotations
 import cerberus
 import functools
 import ujson
-from typing import TypedDict, Any, Callable, Union, Literal, TYPE_CHECKING
+from typing import TypedDict, Any, Callable, Union, Literal
 
 from .enums import JsonErrors
 from .route import RequestHandler
-
-if TYPE_CHECKING:
-    from .route import DictJsonType
 
 class _OptionalSpec(TypedDict, total=False):
     allow_unknown: bool
@@ -56,13 +53,13 @@ Spec = dict[str, _Spec]
 # until cerberus 2.0 comes stable im using my own wrapper that the linter doesnt hate
 
 class Validator:
-    def __init__(self, spec: Spec, ignore_none_values: bool = False, allow_unknown: bool = False, require_all: bool = True, purge_unknown: bool = True, purge_readonly: bool = True):
-        self._validator = cerberus.Validator(spec, ignore_none_values=ignore_none_values, allow_unknown=allow_unknown, require_all=require_all, purge_unknown=purge_unknown, purge_readonly=purge_readonly)
-
-    def validate(self, body: DictJsonType) -> bool:
+    def __init__(self, spec, **kwargs):
+        self._validator = cerberus.Validator(spec, **kwargs)
+    
+    def validate(self, body: dict[str, Any]) -> bool:
         return self._validator.validate(body)  # type: ignore
     
-    def normalized(self, body: DictJsonType) -> DictJsonType:
+    def normalized(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._validator.normalized(body)  # type: ignore
 
     @property
