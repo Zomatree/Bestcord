@@ -10,7 +10,6 @@ class ChannelType:
     private_thread = 12
     stage = 13
 
-
 tup = tuple[int, str]
 
 class JsonErrors:

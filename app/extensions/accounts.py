@@ -1,6 +1,5 @@
 from app.utils import spec, RequestHandler, JsonErrors, CustomError
 
-
 class Accounts(RequestHandler, require_token=False):
     @spec({
         "username": {"type": "string"},
@@ -14,7 +13,6 @@ class Accounts(RequestHandler, require_token=False):
             return self.error(JsonErrors.invalid_form, email="Email is already registered.")
 
         self.finish(account)
-
 
 def setup(app):
     return [(f"/api/v{app.version}/accounts", Accounts, app.args)]

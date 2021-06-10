@@ -1,7 +1,6 @@
 from app.utils import spec, RequestHandler, JsonErrors, ChannelType, filter_channel_keys
 import asyncpg
 
-
 class Channels(RequestHandler):
     @spec({
         "name": {"type": "string", "minlength": 2, "maxlength": 100, "required": True},
@@ -72,7 +71,6 @@ class ChannelID(RequestHandler):
 
         self.application.dispatch_event("channel_delete", channel, index=channel_id, index_type="channel")
         del self.application.destinations["channel"][channel_id]
-
 
 def setup(app):
     return [(f"/api/v{app.version}/guilds/(.+)/channels", Channels, app.args)]

@@ -2,7 +2,6 @@
 from app.utils import spec, RequestHandler, JsonErrors
 import datetime
 
-
 class Guild(RequestHandler):
     @spec({
         "name": {"type": "string", "maxlength": 100, "minlength": 2},

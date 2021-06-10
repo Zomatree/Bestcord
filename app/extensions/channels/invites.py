@@ -2,27 +2,6 @@
 from app.utils import spec, RequestHandler, HTTPErrors
 import datetime
 
-"""
-{'code': 'KhPan9PVbp', 'guild': {
-    'id': '471354723727966208',
-    'name': 'testing',
-    'splash': None,
-    'banner': None,
-    'description': None,
-    'icon': 'aa27cc192a0a2a6a452fbd9e34538b25',
-    'features': ['COMMUNITY', 'NEWS', 'WELCOME_SCREEN_ENABLED'],
-    'verification_level': 2,
-    'vanity_url_code': None,
-    'nsfw': False,
-    'nsfw_level': 0},
-'channel': {'id': '576592045330792458', 'name': 'general', 'type': 0},
-'inviter': {'id': '380423502810972162', 'username': 'Champions', 'avatar': 'ac62e0954c81b64da21ddf9278296423', 'discriminator': '1090', 'public_flags': 0, 'bot': True},
-'approximate_member_count': 6,
-'approximate_presence_count': 4,
-'expires_at': None.
-'expired_at': None}
-"""
-
 class Invites(RequestHandler):
     @spec({
         "max_age": {"type": "number", "default": 86400, "max": 604800, "min": 0, "required": False},
@@ -67,7 +46,6 @@ class Invites(RequestHandler):
         payload["channel_id"] = payload.pop("channel")["id"]
 
         self.application.dispatch_event("invite_create", payload, index=channel_id, index_type="channel")
-
 
 def setup(app):
     return [(f"/api/v{app.version}/channels/(.+)/invites", Invites, app.args)]
