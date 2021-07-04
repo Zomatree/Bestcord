@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from tornado.web import Application, StaticFileHandler, RedirectHandler, RequestHandler
+from rich.logging import RichHandler
 import importlib
 import asyncio
 import logging
-from typing import Any, Protocol, runtime_checkable, Literal, get_args
 import contextlib
+import glob
+from typing import Any, Protocol, runtime_checkable, Literal, get_args
 
 from .utils import DB, TornadoUvloop, Tokens, RatelimitMapping
 from .extensions.gateway import Gateway
@@ -18,12 +20,13 @@ class ExtensionProtocol(Protocol):
 
 destination_keys = Literal["guild", "channel"]
 logger: logging.Logger = logging.getLogger()
+logger.addHandler(RichHandler(log_time_format="[%X]", show_path=False))
 
 class NotFound(RequestHandler):
     def get(self, *_):
         self.set_status(404)
         self.finish('{"message": "404: not found", "code": 0}')
-    
+
     post = get
     delete = get
     patch = get
@@ -41,26 +44,28 @@ class App(Application):
         self.tokens = Tokens(token_config["epoch"], token_config["worker_id"], token_config["process_id"], token_config["secret_key"], token_config["invite_length"])
 
         self.args = {"database": self.database, "tokens": self.tokens}
-        
+
         self.gateway_connections: dict[str, Gateway] = {}  # userid -> gateway
         self.destinations: dict[destination_keys, dict[str, list[str]]] = {}  # type -> id -> userid[]
+        self.member_cache: dict[str, dict[str, dict[str, Any]]] = {}  # guildid -> userid -> user
+        self.user_cache: dict[str, dict[str, Any]] = {}  # userid -> user
 
         self.global_ratelimit = RatelimitMapping.from_ratelimit(50, 1)  # todo: add increased global rate limit stuff
 
         for key in get_args(destination_keys):
             self.destinations[key] = {}
 
-        files: list[str] = config["extensions"]
-        routes = []
+        files: list[str] = glob.glob("./app/extensions/**/*.py", recursive=True)
+        routes: list[Any] = []
 
         for file in files:
-            module_path = f"app.extensions.{file}"
+            module_path = ".".join(file[2:-3].split("/"))
             module = importlib.import_module(module_path)
             if not isinstance(module, ExtensionProtocol):
-                raise Exception(f"'{module_path}' is missing a setup function")
-            
+                raise Exception(f"'{file}' is missing a setup function")
+
             module_routes = module.setup(self)
-            
+
             routes.extend(module_routes)
 
         routes.append(("/", RedirectHandler, {"url": "/index.html"}))
@@ -77,15 +82,15 @@ class App(Application):
 
         TornadoUvloop.current().make_current()
         loop = asyncio.get_event_loop()
-        
+
         db = loop.run_until_complete(DB.from_args(config["database"]))
         server = cls(db, config)
-        
+
         loop.run_until_complete(server.startup())
-       
+
         server.listen(config["app"]["port"], config["app"]["address"])
-        
-        print(f"running at http://{config['app']['address']}:{config['app']['port']}")
+
+        logging.info(f"running at http://{config['app']['address']}:{config['app']['port']}")
         TornadoUvloop.current().start()
 
     def dispatch_event(self, event_name: str, payload: Any, *, index: str, index_type: destination_keys):
