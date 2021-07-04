@@ -1,4 +1,3 @@
-extensions = ["test", "accounts", "login", "get_gateway", "gateway"]  # appends app/extensions/ to the header
 version = 9
 
 [app]
@@ -18,6 +17,7 @@ epoch = 1420070400000  # this is the default discord epoch
 worker_id = 1
 process_id = 0
 secret_key = "insert custom secret key here"
+invite_length = 10
 
 [gateway]
 heartbeat_interval = 45000  # ms
