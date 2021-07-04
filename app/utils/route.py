@@ -3,10 +3,11 @@ from __future__ import annotations
 from tornado.web import RequestHandler as BaseRequestHandler
 from tornado.websocket import WebSocketHandler as BaseWebSocketHandler, WebSocketClosedError
 from tornado.concurrent import Future
-
+from tornado.httputil import HTTPServerRequest
 import ujson
+import math
 
-from typing import Tuple, Optional, Callable, Awaitable, TYPE_CHECKING, Union, Dict, Any, TypeVar, Optional, overload
+from typing import Tuple, Optional, Callable, Awaitable, TYPE_CHECKING, Union, Dict, Any, TypeVar, overload
 
 from .enums import HTTPErrors
 
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 class RequestHandler(BaseRequestHandler):
     require_token: bool
     application: App
+    request: HTTPServerRequest
 
     def __init_subclass__(cls, require_token: bool = True) -> None:
         cls.require_token = require_token
@@ -46,6 +48,20 @@ class RequestHandler(BaseRequestHandler):
             self.user_id = self.tokens.validate_token(token)
         except:
             return self.error(HTTPErrors.unauthorized, status_code=401)
+
+        bucket = self.application.global_ratelimit.get_bucket(self.user_id)
+        retry_after = bucket.update_ratelimit()
+
+        if retry_after:
+            self.set_status(429)
+            return await self.finish({"message": "You are being rate limited.", "retry_after": retry_after, "global": False})
+
+        self.set_header("X-RateLimit-Limit", 50)
+        self.set_header("X-RateLimit-Remaining", bucket.get_tokens())
+        self.set_header("X-RateLimit-Retry-After", math.ceil(bucket.get_retry_after()))
+        self.set_header("X-RateLimit-Bucket", self.user_id)
+        self.set_header("X-RateLimit-Reset", round(bucket._window + bucket.per))
+        self.set_header("X-RateLimit-Global", True)
 
     def error(self, code: Tuple[int, str], status_code: int = 400, **kwargs: Any) -> None:
         return self.send_error(status_code, code=code[0], message=code[1], **kwargs)
@@ -105,7 +121,7 @@ class RequestHandler(BaseRequestHandler):
 
     # our custom .write takes a list as well so we need to modify .finish's signature to take it too
 
-    def finish(self, chunk: Optional[Union[str, bytes, dict, list]] = None) -> "Future[None]":
+    def finish(self, chunk: Optional[Union[str, bytes, dict, list]] = None) -> Future[None]:
         return super().finish(chunk)  # type: ignore
 
 class WebSocketHandler(BaseWebSocketHandler):

@@ -1,10 +1,9 @@
-from app.utils import spec, RequestHandler
-
+from app.utils import spec, RequestHandler, ratelimit
 
 class Test(RequestHandler):
+    @ratelimit(2, 5)
     async def get(self):
-        self.write({"id": self.user_id})
-        self.flush()
+        self.finish({"id": self.user_id})
 
 def setup(app):
     return [(f"/api/v{app.version}/test", Test, app.args)]

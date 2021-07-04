@@ -7,7 +7,7 @@ import logging
 from typing import Any, Protocol, runtime_checkable, Literal, get_args
 import contextlib
 
-from .utils import DB, TornadoUvloop, Tokens
+from .utils import DB, TornadoUvloop, Tokens, RatelimitMapping
 from .extensions.gateway import Gateway
 
 @runtime_checkable
@@ -44,8 +44,8 @@ class App(Application):
         
         self.gateway_connections: dict[str, Gateway] = {}  # userid -> gateway
         self.destinations: dict[destination_keys, dict[str, list[str]]] = {}  # type -> id -> userid[]
-        self.member_cache: dict[str, dict[str, dict]] = {}  # guildid -> userid -> user
-        self.user_cache: dict[str, dict] = {}  # userid -> user
+
+        self.global_ratelimit = RatelimitMapping.from_ratelimit(50, 1)  # todo: add increased global rate limit stuff
 
         for key in get_args(destination_keys):
             self.destinations[key] = {}
