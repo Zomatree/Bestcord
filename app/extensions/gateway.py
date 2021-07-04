@@ -46,8 +46,6 @@ member_chunk_spec: Spec = {
 member_chunk: Validator = Validator(member_chunk_spec, allow_unknown=True)
 
 class Gateway(WebSocketHandler):
-    last_heartbeat_ack: Optional[datetime.datetime]
-
     def initialize(self, database: DB, tokens: Tokens) -> None:
         self.heartbeat_event = asyncio.Event()
         self.last_heartbeat_ack = datetime.datetime.utcnow()

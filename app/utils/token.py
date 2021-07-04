@@ -3,6 +3,7 @@ import itsdangerous
 import base64
 import string
 import secrets
+from typing import Optional
 
 invite_chars: list[str] = list(string.ascii_letters + "1234567890")
 
@@ -32,15 +33,11 @@ class Tokens:
 
         return str(snowflake)
 
-    def validate_token(self, token: str, *, max_age: int = None) -> str:
+    def validate_token(self, token: str, *, max_age: Optional[int] = None) -> str:
         encoded_token = token.encode()
         data = self.signer.unsign(encoded_token, max_age=max_age)
-        if isinstance(data, tuple):
-            id = data[0]
-        else:
-            id = data
 
-        encoded_id = id.decode()
+        encoded_id = data.decode()
         return base64.b64decode(encoded_id).decode()
 
     def generate_invite_code(self) -> str:

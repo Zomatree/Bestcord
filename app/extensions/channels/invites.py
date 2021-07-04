@@ -14,7 +14,7 @@ class Invites(RequestHandler):
         created_at = datetime.datetime.utcnow()
 
         if (max_age := self.body["max_age"]):
-            expires_at = created_at + datetime.timedelta(seconds=max_age)
+            expires_at = (created_at + datetime.timedelta(seconds=max_age)).isoformat()
         else:
             expires_at = None
 
@@ -27,7 +27,7 @@ class Invites(RequestHandler):
             guild = await self.database.get_guild(guild_id, partial=True)
 
             await conn.execute("insert into guild_invites(code, channel_id, max_uses, guild_id, expires_at, inviter_id, max_age, temporary, created_at) values($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                               code, channel_id, self.body["max_uses"], guild_id, expires_at.isoformat(), self.user_id, max_age, self.body["temporary"], created_at.isoformat())
+                               code, channel_id, self.body["max_uses"], guild_id, expires_at, self.user_id, max_age, self.body["temporary"], created_at.isoformat())
 
             channel = await self.database.get_channel(channel_id, conn=conn, partial=True)
             inviter = await self.database.get_user(self.user_id)
@@ -37,7 +37,7 @@ class Invites(RequestHandler):
             "guild": guild,
             "channel": channel,
             "inviter": inviter,
-            "expires_at": expires_at.isoformat()
+            "expires_at": expires_at
         }
 
         self.finish(payload)

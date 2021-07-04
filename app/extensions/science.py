@@ -10,4 +10,3 @@ class Science(RequestHandler):
 
 def setup(app):
     return [(f"/api/v{app.version}/science", Science, app.args)]
-

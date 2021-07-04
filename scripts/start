@@ -1,2 +1,2 @@
 #! /bin/bash
-python3.9 -m app config.toml debug
+python3.9 -m app config.toml ${1:-debug}
