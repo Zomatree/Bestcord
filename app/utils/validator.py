@@ -3,7 +3,8 @@ from __future__ import annotations
 import cerberus
 import functools
 import ujson
-from typing import TypedDict, Any, Callable, Union, Literal
+from typing import TypedDict, Any, Callable, Union, Literal, TypeVar, Coroutine
+from typing_extensions import ParamSpec, Concatenate
 
 from .enums import JsonErrors
 from .route import RequestHandler
@@ -53,7 +54,7 @@ Spec = dict[str, _Spec]
 # until cerberus 2.0 comes stable im using my own wrapper that the linter doesnt hate
 
 class Validator:
-    def __init__(self, spec, **kwargs):
+    def __init__(self, spec: Spec, **kwargs: Any):
         self._validator = cerberus.Validator(spec, **kwargs)
     
     def validate(self, body: dict[str, Any]) -> bool:
@@ -66,13 +67,16 @@ class Validator:
     def errors(self) -> dict[str, Any]:
         return self._validator.errors  # type: ignore
 
-def spec(spec: Spec, ignore_none_values: bool = False, allow_unknown: bool = False, require_all: bool = True, purge_unknown: bool = True, purge_readonly: bool = True) -> Callable:
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def spec(spec: Spec, ignore_none_values: bool = False, allow_unknown: bool = False, require_all: bool = True, purge_unknown: bool = True, purge_readonly: bool = True):
     validator = Validator(spec, ignore_none_values=ignore_none_values, allow_unknown=allow_unknown, require_all=require_all, purge_unknown=purge_unknown, purge_readonly=purge_readonly)
     
-    def inner(f) -> Callable:
+    def inner(f: Callable[Concatenate[RequestHandler, P], Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, Union[R, None]]]:
         @functools.wraps(f)
-        async def wrapper(self: RequestHandler, *args, **kwargs):
-            raw_body = self.request.body
+        async def wrapper(self: RequestHandler, *args: P.args, **kwargs: P.kwargs):
+            raw_body: bytes = self.request.body
             if not raw_body:
                 return self.error(JsonErrors.missing_key)
 
